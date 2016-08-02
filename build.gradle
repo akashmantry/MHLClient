@@ -1,0 +1,72 @@
+apply plugin: 'com.android.library'
+apply plugin: 'com.jfrog.bintray'
+apply plugin: 'com.github.dcendents.android-maven'
+
+group = 'edu.umass.cs.MHLClient'
+version = '1.0.2'
+
+android {
+    compileSdkVersion 24
+    buildToolsVersion "24.0.1"
+
+    defaultConfig {
+        minSdkVersion 15
+        targetSdkVersion 24
+        versionCode 1
+        versionName "1.0.2"
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+dependencies {
+    compile fileTree(dir: 'libs', include: ['*.jar'])
+}
+
+task generateSourcesJar(type: Jar) {
+    from android.sourceSets.main.java.srcDirs
+    classifier 'sources'
+}
+
+task generateJavadocs(type: Javadoc) {
+    source = android.sourceSets.main.java.srcDirs
+    classpath += project.files(android.getBootClasspath()
+            .join(File.pathSeparator))
+}
+
+task generateJavadocsJar(type: Jar) {
+    from generateJavadocs.destinationDir
+    classifier 'javadoc'
+}
+
+generateJavadocsJar.dependsOn generateJavadocs
+
+artifacts {
+    archives generateJavadocsJar
+    archives generateSourcesJar
+}
+
+bintray {
+    user = 'seannoran'
+    key = 'eaa3c801ce0b3fbeb0a275939cef54c3fa4932e9'
+    pkg {
+        repo = 'maven'
+        name = 'edu.umass.cs.MHLClient'
+
+        version {
+            name = '1.0.2'
+            desc = 'Mobile Health Labs Sensor Data Client'
+            released  = new Date()
+            vcsTag = '1.0.2'
+        }
+
+        licenses = ['Apache-2.0']
+        vcsUrl = 'https://github.com/giffy1/MHLClient.git'
+        websiteUrl = 'https://github.com/giffy1/MHLClient'
+    }
+    configurations = ['archives']
+}

@@ -87,7 +87,7 @@ public abstract class SensorReading {
      * Defines how the data is converted to a JSON object.
      * @return a JSON object encoding the sensor reading.
      */
-    public abstract JSONObject toJSONObject();
+    protected abstract JSONObject toJSONObject();
 
     /**
      * Returns a base JSON object with the sensor reading metadata already encoded.

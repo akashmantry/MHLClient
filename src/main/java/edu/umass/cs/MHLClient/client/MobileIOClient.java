@@ -136,8 +136,8 @@ public class MobileIOClient {
 
     /**
      * Sends a sensor reading to the server.
-     * @param reading Any subclass of {@link SensorReading}, e.g. {@link edu.umass.cs.MHLClient.sensors.AccelerometerReading}
-     * @return true if the element was successfully added to the blocking queue, false otherwise
+     * @param reading Any subclass of {@link SensorReading}, e.g. {@link edu.umass.cs.MHLClient.sensors.AccelerometerReading} or a custom reading
+     * @return true if the reading was successfully queued for transmission to the server, false otherwise
      */
     public boolean sendSensorReading(SensorReading reading){
         if (!socket.isConnected() || socket.isClosed())
@@ -146,6 +146,12 @@ public class MobileIOClient {
         return sensorReadingQueue.offer(reading);
     }
 
+    /**
+     * Establishes a connection to the server. Call
+     * {@link #setConnectionStateHandler(ConnectionStateHandler)} first to register
+     * a {@link ConnectionStateHandler} if you wish to handle the
+     * connection and connection failed events.
+     */
     public void connect(){
         new Thread(new Runnable(){
             @Override

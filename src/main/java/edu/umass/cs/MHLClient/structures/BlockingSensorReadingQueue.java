@@ -5,8 +5,9 @@ import java.util.concurrent.ArrayBlockingQueue;
 import edu.umass.cs.MHLClient.sensors.SensorReading;
 
 /**
- * This class is a blocking queue of {@link SensorReading sensor readings}. It
- * has no important functionality but to limit the capacity of the blocking queue.
+ * This class is a blocking queue of {@link SensorReading sensor readings}.
+ * It defines a queue of capacity {@link #QUEUE_CAPACITY} containing sensor readings
+ * that will be sent to the server.
  *
  * @author Erik Risinger
  *

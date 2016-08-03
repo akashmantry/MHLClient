@@ -32,7 +32,7 @@ public class RSSIReading extends SensorReading {
     }
 
     @Override
-    public JSONObject toJSONObject() {
+    protected JSONObject toJSONObject() {
         JSONObject data = getBaseJSONObjet();
         JSONObject obj = new JSONObject();
 

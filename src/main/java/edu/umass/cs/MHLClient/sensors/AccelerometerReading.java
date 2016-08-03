@@ -40,7 +40,7 @@ public class AccelerometerReading extends SensorReading {
     }
 
     @Override
-    public JSONObject toJSONObject(){
+    protected JSONObject toJSONObject(){
         JSONObject data = getBaseJSONObjet();
         JSONObject obj = new JSONObject();
 

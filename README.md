@@ -1,5 +1,7 @@
 # Mobile Health Lab Client
 
+[ ![Download](https://api.bintray.com/packages/seannoran/maven/edu.umass.cs.MHLClient/images/download.svg) ](https://bintray.com/seannoran/maven/edu.umass.cs.MHLClient/_latestVersion)
+
 ## Introduction
 
 This library sends various sensor data to the mHealth Lab server for real-time visualization. This is primarily intended for analyzing on-body sensor data with the goal of improving mobile health.

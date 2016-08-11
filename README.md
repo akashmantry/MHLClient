@@ -6,6 +6,14 @@
 
 This library sends various sensor data to the mHealth Lab server for real-time visualization. This is primarily intended for analyzing on-body sensor data with the goal of improving mobile health.
 
+## Getting Started
+
+To start using the MHL Client in your project, add the following dependency to your build.gradle file:
+
+```java
+compile 'edu.umass.cs.MHLClient:mhlclient:1.0.4'
+```
+
 ## Usage
 
 Initialize a `MobileIOClient` as follows:
@@ -37,3 +45,14 @@ client.sendSensorReading(new AccelerometerReading(userId, DeviceType.MOBILE_ANDR
 ```
 
 Available device types are defined in the `DeviceType` enum. You can define custom sensing modalities by subclassing the `SensorReading` class as `AccelerometerReading` does.
+
+If you expect to receive messages back from the server, you can register a `MessageReceiver` using the `client.setMessageReceiver(MessageReceiver)` method as follows.
+
+```java
+client.setMessageReceiver(new MessageReceiver() {
+@Override
+public void onMessageReceived(String json) {
+//handle message
+}
+});
+```

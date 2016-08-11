@@ -44,6 +44,11 @@ public class MobileIOClient {
     private ConnectionStateHandler connectionStateHandler;
 
     /**
+     * The message receiver is notified when data is received from the server.
+     */
+    private MessageReceiver messageReceiver;
+
+    /**
      * The default connection timeout.
      * @see #connectionTimeoutMillis
      */
@@ -132,6 +137,15 @@ public class MobileIOClient {
      */
     public void setConnectionStateHandler(ConnectionStateHandler connectionStateHandler){
         this.connectionStateHandler = connectionStateHandler;
+    }
+
+    /**
+     * Sets the message received for handling messages received from the server.
+     * @param messageReceiver defines how incoming messages are handled.
+     * @see MessageReceiver#onMessageReceived(String)
+     */
+    public void setMessageReceiver(MessageReceiver messageReceiver){
+        this.messageReceiver = messageReceiver;
     }
 
     /**
@@ -279,6 +293,8 @@ public class MobileIOClient {
 
                 while ((inputLine = input.readLine()) != null){
                     Log.d("received notification: ", inputLine);
+                    if (messageReceiver != null)
+                        messageReceiver.onMessageReceived(inputLine);
                 }
 
             } catch (IOException e) {

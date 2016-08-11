@@ -50,9 +50,11 @@ If you expect to receive messages back from the server, you can register a `Mess
 
 ```java
 client.setMessageReceiver(new MessageReceiver() {
-@Override
-public void onMessageReceived(String json) {
-//handle message
-}
+    @Override
+    public void onMessageReceived(String json) {
+        //handle message
+    }
 });
 ```
+
+The received `String` is by convention a JSON string, which can be parsed into a JSON object for accessing its content.

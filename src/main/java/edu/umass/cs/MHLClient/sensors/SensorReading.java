@@ -3,8 +3,6 @@ package edu.umass.cs.MHLClient.sensors;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import edu.umass.cs.MHLClient.devices.DeviceType;
-
 /**
  * Base class for a sensor reading. You may use existing implementations such
  * as {@link AccelerometerReading} or, if your sensing modality is not available,
@@ -14,7 +12,6 @@ import edu.umass.cs.MHLClient.devices.DeviceType;
  * @author Erik Risinger
  *
  * @see JSONObject
- * @see DeviceType
  * @see AccelerometerReading
  * @see GyroscopeReading
  * @see RSSIReading
@@ -23,16 +20,22 @@ import edu.umass.cs.MHLClient.devices.DeviceType;
 public abstract class SensorReading {
 
     /** A 10-byte hex string identifying the current user. **/
-    protected String userID;
+    protected final String userID;
 
-    /** Identifies the device, as defined in {@link DeviceType}. **/
-    protected DeviceType deviceType;
+    /** Describes the device **/
+    protected final String deviceType;
+
+    /** Unique string identifying the device. **/
+    protected final String deviceID;
 
     /** Identifies the sensor type. **/
-    protected String sensorType;
+    protected final String sensorType;
 
     /** Indicates when the sensor reading occurred. **/
-    protected long timestamp;
+    protected final long timestamp;
+
+    /** Indicates the label, -1 indicates that no label is available **/
+    protected final int label;
 
     /**
      * Instantiates a sensor reading object. Because {@link SensorReading} is
@@ -40,15 +43,38 @@ public abstract class SensorReading {
      * metadata common across sensing modalities.
      *
      * @param userID a 10-byte hex string identifying the current user.
-     * @param deviceType identifies the device, as defined in {@link DeviceType}.
+     * @param deviceType describes the device.
+     * @param deviceID TODO
      * @param sensorType identifies the sensor type.
      * @param timestamp indicates when the sensor reading occurred, in Unix time by convention.
      */
-    protected SensorReading(String userID, DeviceType deviceType, String sensorType, long timestamp){
+    protected SensorReading(String userID, String deviceType, String deviceID, String sensorType, long timestamp){
         this.userID = userID;
         this.deviceType = deviceType;
+        this.deviceID = deviceID;
         this.sensorType = sensorType;
         this.timestamp = timestamp;
+        this.label = -1;
+    }
+
+    /**
+     * Instantiates a sensor reading object. Because {@link SensorReading} is
+     * abstract, this should only be called by subclasses for initializing
+     * metadata common across sensing modalities.
+     *
+     * @param userID a 10-byte hex string identifying the current user.
+     * @param deviceType describes the device.
+     * @param deviceID TODO
+     * @param sensorType identifies the sensor type.
+     * @param timestamp indicates when the sensor reading occurred, in Unix time by convention.
+     */
+    protected SensorReading(String userID, String deviceType, String deviceID, String sensorType, long timestamp, int label){
+        this.userID = userID;
+        this.deviceType = deviceType;
+        this.deviceID = deviceID;
+        this.sensorType = sensorType;
+        this.timestamp = timestamp;
+        this.label = label;
     }
 
     /**
@@ -61,9 +87,9 @@ public abstract class SensorReading {
 
     /**
      * Gets the device type associated with the sensor reading.
-     * @return a device type as defined in {@link DeviceType}.
+     * @return a String representing the device type.
      */
-    public DeviceType getDeviceType(){
+    public String getDeviceType(){
         return deviceType;
     }
 
@@ -95,13 +121,20 @@ public abstract class SensorReading {
      * that use this method.
      * @return a JSON object encoding the metadata.
      */
-    protected JSONObject getBaseJSONObjet(){
+    protected JSONObject getBaseJSONObject(){
         JSONObject obj = new JSONObject();
+        JSONObject device = new JSONObject();
 
         try {
+            device.put("device_type", deviceType);
+            device.put("device_id", deviceID);
             obj.put("user_id", userID);
             obj.put("device_type", deviceType);
+            obj.put("device", device);
             obj.put("sensor_type", sensorType);
+            if (label != -1){
+                obj.put("label", label);
+            }
         } catch (JSONException e) {
             e.printStackTrace();
         }

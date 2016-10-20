@@ -8,5 +8,5 @@ package edu.umass.cs.MHLClient.client;
  */
 public interface ConnectionStateHandler {
     void onConnected();
-    void onConnectionFailed();
+    void onConnectionFailed(Exception e);
 }

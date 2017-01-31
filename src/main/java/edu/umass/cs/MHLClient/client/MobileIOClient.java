@@ -64,30 +64,18 @@ public class MobileIOClient {
      */
     private ArrayList<MessageReceiver> messageReceivers;
 
-    /**
-     * The default connection timeout.
-     * @see #connectionTimeoutMillis
-     */
-    private static final int DEFAULT_CONNECTION_TIMEOUT_MILLIS = 5000;
-
-    /**
-     * The number of milliseconds after which a server connection attempt ends and the
-     * {@link ConnectionStateHandler#onConnectionFailed(Exception)} method is called.
-     */
-    private int connectionTimeoutMillis;
-
     /** The socket to the server. **/
     private SSLSocket socket;
 
     /**
      * The IP address of the server.
      */
-    private static final String ip = "192.168.25.149"; //"none.cs.umass.edu";
+    private static final String ip = "none.cs.umass.edu"; //"192.168.24.58"; //"none.cs.umass.edu";
 
     /**
      * The port on the server listening for incoming data.
      */
-    private static final int port = 9997; // = 9999;
+    private static final int port = 9997;
 
     /**
      * Singleton instance.
@@ -104,7 +92,20 @@ public class MobileIOClient {
      */
     private Thread consumptionThread;
 
+    /**
+     * Context required to access resources, i.e. keystore.
+     */
     private Context context;
+
+    /**
+     * Receives data from the server.
+     */
+    private BufferedReader input;
+
+    /**
+     * Writes data to the server.
+     */
+    private BufferedWriter output;
 
     /**
      * Creates a singleton mobile IO client instance with a pre-existing (external)
@@ -112,51 +113,13 @@ public class MobileIOClient {
      * @param context the context to access application resources.
      * @param q a blocking queue containing sensor reading objects
      * @param id the user ID required to validate the connection
-     * @param connectionTimeoutMillis The number of milliseconds after which the connection fails.
      */
-    private MobileIOClient(final Context context, final BlockingSensorReadingQueue q, final String id, final int connectionTimeoutMillis){
+    private MobileIOClient(final Context context, final BlockingSensorReadingQueue q, final String id){
         this.sensorReadingQueue = q;
         this.userID = id;
-        this.connectionTimeoutMillis = connectionTimeoutMillis;
         messageReceivers = new ArrayList<>();
         instance = this;
         this.context = context;
-
-//        SSLSocketFactory sslsocketfactory = (SSLSocketFactory) SSLSocketFactory.getDefault();
-//        try {
-//            socket = (SSLSocket) sslsocketfactory.createSocket(ip, port);
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//        }
-    }
-
-    /**
-     * Creates a mobile IO client with a pre-existing (external) blocking queue and
-     * a user-defined connection timeout.
-     * @param q a blocking queue containing sensor reading objects
-     * @param id the user ID required to validate the connection
-     * @param connectionTimeoutMillis The number of milliseconds after which the connection fails.
-     */
-    public static MobileIOClient getInstance(final Context context, final BlockingSensorReadingQueue q, final String id, final int connectionTimeoutMillis){
-        if (instance == null){
-            return new MobileIOClient(context, q, id, connectionTimeoutMillis);
-        }
-        return instance;
-    }
-
-
-
-    /**
-     * Creates a mobile IO client with a self-contained blocking queue and
-     * a user-defined connection timeout.
-     * @param id the user ID required to validate the connection
-     * @param connectionTimeoutMillis The number of milliseconds after which the connection fails.
-     */
-    public static MobileIOClient getInstance(final Context context, final String id, final int connectionTimeoutMillis){
-        if (instance == null){
-            return new MobileIOClient(context, new BlockingSensorReadingQueue(), id, connectionTimeoutMillis);
-        }
-        return instance;
     }
 
     /**
@@ -166,7 +129,7 @@ public class MobileIOClient {
      */
     public static MobileIOClient getInstance(final Context context, final BlockingSensorReadingQueue q, final String id){
         if (instance == null){
-            return new MobileIOClient(context, q, id, DEFAULT_CONNECTION_TIMEOUT_MILLIS);
+            return new MobileIOClient(context, q, id);
         }
         return instance;
     }
@@ -177,7 +140,7 @@ public class MobileIOClient {
      */
     public static MobileIOClient getInstance(final Context context, final String id){
         if (instance == null){
-            return new MobileIOClient(context, new BlockingSensorReadingQueue(), id, DEFAULT_CONNECTION_TIMEOUT_MILLIS);
+            return new MobileIOClient(context, new BlockingSensorReadingQueue(), id);
         }
         return instance;
     }
@@ -222,9 +185,6 @@ public class MobileIOClient {
      * @return true if the reading was successfully queued for transmission to the server, false otherwise
      */
     public boolean sendSensorReading(SensorReading reading){
-//        if (!socket.isConnected() || socket.isClosed())
-//            connect();
-
         return sensorReadingQueue.offer(reading);
     }
 
@@ -247,56 +207,33 @@ public class MobileIOClient {
                         socketFactory.setHostnameVerifier(SSLSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER);
                         socket = (SSLSocket) socketFactory.createSocket(new Socket(ip, port), ip, port, false);
                         socket.startHandshake();
-                    }catch(IOException e){
-                        e.printStackTrace();
-                    }catch(KeyStoreException e){
-                        e.printStackTrace();
-                    } catch (CertificateException e) {
-                        e.printStackTrace();
-                    } catch (UnrecoverableKeyException e) {
-                        e.printStackTrace();
-                    } catch (NoSuchAlgorithmException e) {
-                        e.printStackTrace();
-                    } catch (KeyManagementException e) {
+                    }catch( IOException | KeyStoreException |
+                            UnrecoverableKeyException | CertificateException |
+                            KeyManagementException | NoSuchAlgorithmException e){
+
                         e.printStackTrace();
                     }
 
-                    Log.d(TAG, "STARTING SENSOR THREAD");
+                    Log.i(TAG, "STARTING SENSOR THREAD");
 
-//                    try {
-//                        Log.d(TAG, "connecting to server: " + ip + ":" + port);
-//                        socket.connect(new InetSocketAddress(ip, port), connectionTimeoutMillis);
-//                    } catch (Exception e) {
-//                        e.printStackTrace();
-//                        if (connectionStateHandler != null)
-//                            connectionStateHandler.onConnectionFailed(e);
-//                        return;
-//                    }
+                    if (connectToServer()) {
+                        //connection successful -- launch transmission thread
+                        final TransmissionRunnable transmissionRunnable = new TransmissionRunnable();
+                        transmissionThread = new Thread(transmissionRunnable);
+                        transmissionThread.start();
 
-                    try {
-                        BufferedReader input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                        String handshake = input.readLine();
-                        if (handshake == null || !handshake.equals("ID")){
-                            Log.w(TAG, "Handshake failed.");
-                            return;
-                        }
-                    } catch (IOException e) {
-                        e.printStackTrace();
+                        //launch notification consumption thread
+                        final ConsumptionRunnable consumptionRunnable = new ConsumptionRunnable();
+                        consumptionThread = new Thread(consumptionRunnable);
+                        consumptionThread.start();
+
+                        Log.i(TAG, "Connected to server.");
+                    }else {
+                        Log.i(TAG, "Connection failed.");
+                        return;
                     }
-
-                    //connection successful -- launch transmission thread
-                    final TransmissionRunnable transmissionRunnable = new TransmissionRunnable();
-                    transmissionThread = new Thread(transmissionRunnable);
-                    transmissionThread.start();
-
-                    //launch notification consumption thread
-                    final ConsumptionRunnable consumptionRunnable = new ConsumptionRunnable();
-                    consumptionThread = new Thread(consumptionRunnable);
-                    consumptionThread.start();
-
-                    Log.d(TAG, "Connected to server.");
                 } else {
-                    Log.d(TAG, "Already connected to server.");
+                    Log.i(TAG, "Already connected to server.");
                 }
                 if (connectionStateHandler != null)
                     connectionStateHandler.onConnected();
@@ -305,9 +242,76 @@ public class MobileIOClient {
     }
 
     /**
+     * Authenticates the user with a handshake.
+     */
+    private boolean connectToServer(){
+        Log.i(TAG, "connectToServer()");
+
+        try {
+            input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            output = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+            String handshake = input.readLine();
+            if (handshake == null || !handshake.equals("ID")){
+                Log.w(TAG, "Handshake failed.");
+                return false;
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        String outString = "ID," + userID + "\n";
+        Log.i(TAG, outString);
+
+        //send user ID
+        try {
+            output.write(outString);
+            output.flush();
+        }catch (IOException e){
+            e.printStackTrace();
+            if (connectionStateHandler != null) {
+                connectionStateHandler.onConnectionFailed(e);
+            }
+            return false;
+        }
+
+        //read in ACK
+        String ackString;
+        try {
+            ackString = input.readLine();
+        } catch (IOException e) {
+            e.printStackTrace();
+            if (connectionStateHandler != null) {
+                connectionStateHandler.onConnectionFailed(e);
+            }
+            return false;
+        }
+        if (ackString == null){
+            Log.e(TAG, "ACK is null.");
+            if (connectionStateHandler != null) {
+                connectionStateHandler.onConnectionFailed(new AuthenticationException());
+            }
+            return false;
+        }
+        String[] ack = ackString.split(",");
+
+        Log.i(TAG, "Ack string: " + ackString);
+        Log.i(TAG, "User ID: " + userID);
+
+        //expecting "ACK" with user ID echoed back as CSV string, e.g.: "ACK,0"
+        if (!("ACK".equals(ack[0]) && ack[1].equals(userID))){
+            if (connectionStateHandler != null) {
+                connectionStateHandler.onConnectionFailed(new AuthenticationException());
+            }
+            return false;
+        }
+        return true;
+    }
+
+    /**
      * Closes the socket connection.
      */
     public void disconnect(){
+        Log.i(TAG, "disconnect()");
         transmissionThread.interrupt();
         consumptionThread.interrupt();
         sensorReadingQueue.clear();
@@ -318,104 +322,48 @@ public class MobileIOClient {
      * It must be initialized with a valid open socket.
      */
     private class TransmissionRunnable implements Runnable {
-        private BufferedWriter output;
-        private BufferedReader input;
-
-        public TransmissionRunnable(){
-            try {
-                this.output = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
-                this.input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            }
-            catch (Exception e){
-                e.printStackTrace();
-            }
-        }
+        public TransmissionRunnable(){}
         public void run(){
             ArrayList<SensorReading> latestReadings;
 
-            this.connectToServer();
-
             //transmit data continuously until stopped
-            while (!Thread.currentThread().isInterrupted()){
-                //auto reconnect in case of interruption
-//                if (!running) this.connectToServer();
-//                System.out.println("inside while");
-                try {
+            //auto reconnect in case of interruption
+//          if (!running) this.connectToServer();
+            try {
+                while (!Thread.currentThread().isInterrupted()) {
                     latestReadings = new ArrayList<>();
                     sensorReadingQueue.drainTo(latestReadings);
 
-                    for (int i = 0; i < latestReadings.size(); i++){
+                    for (int i = 0; i < latestReadings.size(); i++) {
                         SensorReading reading = latestReadings.get(i);
-//                        Log.d(TAG, "" + reading.toJSONString());
+                        Log.d(TAG, "Sending data to server: " + reading.toJSONString());
                         output.write(reading.toJSONString() + "\n");
                         output.flush();
                     }
                     Thread.sleep(10);
-                } catch (IOException | InterruptedException e){
+                }
+            } catch (IOException | InterruptedException e){
+                e.printStackTrace();
+            } finally {
+//                try {
+//                    Log.i(TAG, "Sending null character to request termination...");
+//                    output.write("\0\n");
+//                    output.flush();
+//                } catch (IOException e) {
+//                    e.printStackTrace();
+//                }
+                try {
+                    output.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                try {
+                    if (socket != null)
+                        socket.close();
+                } catch (IOException e) {
                     e.printStackTrace();
                 } finally {
-                    try {
-                        output.write("\0\n");
-                        output.flush();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                    try {
-                        output.close();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                    try {
-                        socket.close();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }
-            }
-        }
-
-        /**
-         * Authenticates the user with a handshake.
-         */
-        private void connectToServer(){
-            Log.d(TAG, "connectToServer()");
-
-            String outString = "ID," + userID + "\n";
-            Log.d(TAG, outString);
-
-            //send user ID
-            try {
-                output.write(outString);
-                output.flush();
-            }catch (IOException e){
-                e.printStackTrace();
-                if (connectionStateHandler != null) {
-                    connectionStateHandler.onConnectionFailed(e);
-                }
-                return;
-            }
-
-            //read in ACK
-            String ackString;
-            try {
-                ackString = input.readLine();
-                input.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-                if (connectionStateHandler != null) {
-                    connectionStateHandler.onConnectionFailed(e);
-                }
-                return;
-            }
-            String[] ack = ackString.split(",");
-
-            Log.d(TAG, "Ack string: " + ackString);
-            Log.d(TAG, "User ID: " + userID);
-
-            //expecting "ACK" with user ID echoed back as CSV string, e.g.: "ACK,0"
-            if (!("ACK".equals(ack[0]) && ack[1].equals(userID))){
-                if (connectionStateHandler != null) {
-                    connectionStateHandler.onConnectionFailed(new AuthenticationException());
+                    socket = null;
                 }
             }
         }
@@ -426,19 +374,16 @@ public class MobileIOClient {
      * It must be initialized with a valid open socket.
      */
     private class ConsumptionRunnable implements Runnable {
-        private BufferedReader input;
-
         public void run(){
             try {
-                String json;
-                this.input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                String json=null;
 
                 while (!Thread.currentThread().isInterrupted() && (json = input.readLine()) != null){
-                    Log.d("received notification: ", json);
+                    Log.i("received notification: ", json);
                     try {
                         JSONObject obj = new JSONObject(json);
                         String sensorType = obj.getString("sensor_type");
-                        Log.d(TAG, "Notification has sensor type " + sensorType);
+                        Log.i(TAG, "Notification has sensor type " + sensorType);
                         if (sensorType.equals("SENSOR_SERVER_MESSAGE")) {
                             String message = obj.getString("message");
                             for (MessageReceiver receiver : messageReceivers) {
@@ -450,8 +395,14 @@ public class MobileIOClient {
                         e.printStackTrace();
                     }
                 }
+                if (json == null) {
+                    Log.i(TAG, "Received null character. Terminating consumption thread...");
+                } else {
+                    Log.i(TAG, "Thread interrupted. Terminating consumption thread...");
+                }
 
             } catch (IOException e) {
+                Log.e(TAG, "IO Error receiving data from server.");
                 e.printStackTrace();
             } finally {
                 try {
@@ -459,7 +410,7 @@ public class MobileIOClient {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-                Log.d(TAG, "Consumption thread terminated.");
+                Log.i(TAG, "Consumption thread terminated.");
             }
         }
     }
